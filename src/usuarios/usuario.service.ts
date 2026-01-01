@@ -36,4 +36,9 @@ export class UsuarioService {
   remove(id: number) {
     return this.usuarioRepository.delete(id);
   }
+
+
+  async findByNombre(nombre_usuario: string): Promise<Usuario | null> {
+    return this.usuarioRepository.findOneBy({ nombre_usuario });
+  }
 }
