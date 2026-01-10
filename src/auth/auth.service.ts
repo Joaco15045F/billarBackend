@@ -34,4 +34,9 @@ export class AuthService {
             access_token: this.jwtService.sign(payload),
         };
     }
+
+    async register(nombre_usuario: string, contrasena: string){
+        const hashedPassword = await bcrypt.hash(contrasena, 10);
+        return this.usuarioService.create({ nombre_usuario, contrasena_hash: hashedPassword });
+    }
 }

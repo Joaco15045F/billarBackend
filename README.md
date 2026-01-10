@@ -1,23 +1,70 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend Sistema Billar Camargo
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Este es el backend para el sistema de gestión de billar Camargo, desarrollado con NestJS y TypeORM.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
+## Descripción
+
+El sistema permite gestionar ventas en un billar con pagos por ítem:
+
+- Cada producto agregado crea un ítem de cobro pendiente.
+- Al cerrar la mesa, se crea un ítem para el tiempo usado.
+- No se puede cerrar la venta hasta que todos los ítems estén pagados.
+- Pagos parciales por ítem.
+
+## Endpoints Principales
+
+- NestJS
+- TypeORM
+- MySQL
+- JWT para autenticación
+- Class Validator para validaciones
+
+## Instalación
+
+1. Clona el repositorio.
+2. Instala dependencias: `npm install`
+3. Copia `.env.example` a `.env` y configura las variables de entorno.
+4. Ejecuta el script SQL en `base_de_datos.txt` para crear la base de datos.
+5. Ejecuta: `npm run start:dev`
+
+## Endpoints Principales
+
+### Auth
+- POST /auth/login
+- POST /auth/register
+
+### Ventas
+- POST /ventas/abrir
+- GET /ventas/abierta
+- POST /ventas/calcular/:id (calcula tiempo y crea ítem recurso)
+- POST /ventas/cerrar/:id (cierra solo si todo pagado)
+- POST /ventas/:id/productos
+- GET /ventas/:id
+- GET /ventas?fecha=YYYY-MM-DD (reportes por día)
+- GET /ventas
+- POST /ventas/anular/:id
+- POST /ventas/items-cobro/:itemId/pagar
+
+### Items de Cobro
+- GET /items-cobro (por venta, etc.)
+
+### Productos
+- GET /productos/activos
+- POST /productos/crear
+- PUT /productos/actualizar/:id
+- PUT /productos/desactivar/:id
+
+### Recursos
+- GET /recursos
+- POST /recursos
+- PUT /recursos/:id
+- DELETE /recursos/:id
+
+## Scripts
+
+- `npm run build`: Compilar
+- `npm run start:dev`: Ejecutar en modo desarrollo
+- `npm run test`: Ejecutar pruebas
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 

@@ -1,0 +1,188 @@
+CREATE DATABASE billar_camargo
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE billar_camargo;
+
+
+CREATE TABLE usuarios(
+	id INT primary key auto_increment,
+    nombre_usuario varchar(50) not null,
+    contrasena_hash varchar(255) not null,
+    fecha_creacion datetime default current_timestamp
+);
+
+
+
+CREATE TABLE recursos(
+	id INT primary key auto_increment,
+    nombre varchar(50) not null,
+    tipo varchar(20) not null,
+    precio_por_hora decimal(10,2) not null,
+    activo boolean default true
+);
+
+
+CREATE TABLE productos(
+	id int primary key auto_increment,
+    nombre varchar(50) not null,
+    precio decimal(10,2) not null,
+    activo boolean default true
+);
+
+
+
+CREATE TABLE compras(
+	id int primary key auto_increment,
+    fecha_compra datetime default current_timestamp,
+    costo_total decimal(10,2) not null,
+    fecha_creacion datetime default current_timestamp
+);
+
+
+CREATE TABLE detalle_compras(
+	id int primary key auto_increment,
+    compra_id int not null,
+    nombre_producto varchar(50) not null,
+    cantidad int not null,
+    costo_unitario decimal(10,2) not null,
+    subtotal decimal(10,2) not null,
+    foreign key(compra_id) references compras(id)
+);
+
+
+CREATE TABLE ventas(
+	id int primary key auto_increment,
+    recursos_id int not null,
+    hora_inicio datetime not null,
+    hora_fin datetime,
+    duracion_horas decimal(5,2),
+    total_recurso decimal(10,2),
+    total_productos decimal(10,2),
+    total_venta decimal(10,2),
+    metodo_pago varchar(10),
+    nota_pago varchar(255),
+    estado varchar(10) not null
+		CHECK (estado in ('ABIERTA', 'CERRADA','ANULADA')),
+	fecha_creacion datetime default current_timestamp,
+    foreign key (recursos_id) references recursos(id)
+);
+
+
+
+CREATE TABLE detalle_venta(
+	id int primary key auto_increment,
+    venta_id int not null,
+    producto_id int not null,
+    nombre_producto varchar(50) not null,
+    cantidad int not null,
+    precio_unitario decimal(10,2) not null,
+    subtotal decimal(10,2) not null,
+    foreign key (venta_id) references ventas(id),
+    foreign key (producto_id) references productos(id)
+);
+
+
+show tables;
+
+
+
+INSERT INTO recursos (nombre,tipo,precio_por_hora) VALUES
+('Mesa Billar 1', 'BILLAR', 20.00),
+('Mesa Billar 2', 'BILLAR', 20.00),
+('Mesa Billar 3', 'BILLAR', 20.00),
+('Futbolín 1', 'FUTBOLIN', 10.00),
+('Futbolín 2', 'FUTBOLIN', 10.00),
+('Air Hockey', 'AIR_HOCKEY', 15.00);
+
+
+
+
+INSERT INTO productos (nombre, precio) VALUES
+('Cerveza Lata', 10.00),
+('Coca Machucada', 8.00),
+('Fernet', 40.00);
+
+
+
+SELECT * FROM usuarios;
+SELECT * FROM recursos;
+SELECT * FROM ventas;
+SELECT * FROM productos;
+
+DESCRIBE ventas;
+DESCRIBE productos;
+
+ALTER TABLE recursos
+ADD fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+
+ALTER TABLE ventas 
+ADD COLUMN total DECIMAL(10,2) NOT NULL DEFAULT 0;
+
+
+ALTER TABLE ventas
+ADD COLUMN usuario_id INT NOT NULL,
+ADD FOREIGN KEY (usuario_id) REFERENCES usuarios(id);
+
+
+
+ALTER TABLE ventas
+ADD COLUMN usuario_id INT NOT NULL,
+ADD CONSTRAINT fk_ventas_usuario
+FOREIGN KEY (usuario_id) REFERENCES usuarios(id);
+
+
+
+ALTER TABLE ventas
+MODIFY estado VARCHAR(10) NOT NULL
+DEFAULT 'ABIERTA'
+CHECK (estado IN ('ABIERTA','CERRADA','ANULADA'));
+
+
+SET GLOBAL time_zone = '-04:00';
+SET time_zone = '-04:00';
+
+
+SELECT @@global.time_zone, @@session.time_zone;
+
+
+
+
+-- Actualizar Cerveza Lata (ID 1)
+UPDATE productos SET nombre = 'Cerveza en Lata', precio = 14.00 WHERE id = 1;
+
+-- Actualizar Coca Machucada (ID 2)
+UPDATE productos SET precio = 14.00 WHERE id = 2;
+
+-- Actualizar Fernet (ID 3) a Combo Fernet
+UPDATE productos SET nombre = 'Combo Fernet', precio = 90.00 WHERE id = 3;
+
+INSERT INTO productos (nombre, precio, activo) VALUES 
+('Combo Vodka', 90.00, true),
+('Combo Singani', 110.00, true),
+('Cerveza de Litro', 27.00, true),
+('Mini Coca Cola', 3.00, true),
+('Cigarros Bohem 2u', 2.50, true),
+('Cigarros Cajetilla', 25.00, true);
+
+
+
+
+ALTER TABLE productos
+ADD fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP;
+
+
+
+
+CREATE TABLE items_cobro (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    venta_id INT NOT NULL,
+    tipo ENUM('PRODUCTO', 'RECURSO') NOT NULL,
+    descripcion VARCHAR(100) NOT NULL,
+    cantidad INT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    pagado BOOLEAN DEFAULT FALSE,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id)
+);
