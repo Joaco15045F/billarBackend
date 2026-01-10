@@ -8,9 +8,10 @@ import { DetalleVenta } from './detalle-venta.entity';
 import { Producto } from 'src/productos/productos.entity';
 import { ProductosModule } from 'src/productos/productos.module';
 import { ItemCobro } from '../items-cobro/item-cobro.entity';
+import { PromocionesModule } from '../promociones/promociones.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Venta, DetalleVenta, Producto, ItemCobro]), AuthModule, ProductosModule],
+  imports: [TypeOrmModule.forFeature([Venta, DetalleVenta, Producto, ItemCobro]), AuthModule, ProductosModule, PromocionesModule],
   providers: [VentasService],
   controllers: [VentasController]
 })

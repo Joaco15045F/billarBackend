@@ -21,9 +21,9 @@ export class ItemCobro {
 
   @Column({
     type: 'enum',
-    enum: ['PRODUCTO', 'RECURSO'],
+    enum: ['PRODUCTO', 'RECURSO', 'PROMOCION'],
   })
-  tipo: 'PRODUCTO' | 'RECURSO';
+  tipo: 'PRODUCTO' | 'RECURSO' | 'PROMOCION';
 
   @Column()
   descripcion: string;

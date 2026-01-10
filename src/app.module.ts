@@ -10,6 +10,7 @@ import { RecursosModule } from './recursos/recursos.module';
 import { VentasModule } from './ventas/ventas.module';
 import { ProductosModule } from './productos/productos.module';
 import { ItemsCobroModule } from './items-cobro/items-cobro.module';
+import { PromocionesModule } from './promociones/promociones.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ItemsCobroModule } from './items-cobro/items-cobro.module';
     VentasModule,
     ProductosModule,
     ItemsCobroModule,
+    PromocionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

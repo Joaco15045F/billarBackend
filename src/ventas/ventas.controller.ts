@@ -63,4 +63,9 @@ export class VentasController {
   pagarItem(@Param('itemId') itemId: number) {
     return this.ventasService.pagarItemCobro(Number(itemId));
   }
+
+  @Post(':id/aplicar-regalo')
+  aplicarRegalo(@Param('id') ventaId: number, @Body() body: { opcion: string }) {
+    return this.ventasService.aplicarRegaloPromocion(Number(ventaId), body.opcion);
+  }
 }

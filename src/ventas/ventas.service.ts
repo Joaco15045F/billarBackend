@@ -9,6 +9,7 @@ import { Venta } from './ventas.entity';
 import { DetalleVenta } from './detalle-venta.entity';
 import { Producto } from '../productos/productos.entity';
 import { ItemCobro } from '../items-cobro/item-cobro.entity';
+import { PromocionesService } from '../promociones/promociones.service';
 import moment from 'moment-timezone';
 
 @Injectable()
@@ -25,6 +26,8 @@ export class VentasService {
 
     @InjectRepository(ItemCobro)
     private itemCobroRepository: Repository<ItemCobro>,
+
+    private promocionesService: PromocionesService,
   ) {}
 
   // Abrir venta
@@ -97,7 +100,7 @@ export class VentasService {
 
     venta.total_productos = Number(totalProductos.sum) || 0;
     venta.total_venta = Number(
-      (venta.total_productos + (venta.total_recurso || 0)).toFixed(2),
+      (Number(venta.total_productos || 0) + Number(venta.total_recurso || 0)).toFixed(2),
     );
 
     return this.ventasRepository.save(venta);
@@ -143,13 +146,25 @@ export class VentasService {
       await this.itemCobroRepository.save(itemRecurso);
     }
 
+    // Verificar promociones de tiempo
+    const promocion = await this.promocionesService.verificarPromocionTiempo(duracionHoras);
+    let regaloDisponible = null;
+    if (promocion) {
+      regaloDisponible = promocion.beneficio.opciones; // Array de opciones
+    }
+
     // Actualizar la venta con hora_fin, duracion, total_recurso
     venta.hora_fin = horaFin;
     venta.duracion_horas = duracionHoras;
     venta.total_recurso = totalRecurso;
     venta.total_venta = Number((Number(venta.total_productos || 0) + totalRecurso).toFixed(2));
 
-    return this.ventasRepository.save(venta);
+    const ventaGuardada = await this.ventasRepository.save(venta);
+
+    return {
+      ...ventaGuardada,
+      regalo_disponible: regaloDisponible,
+    };
   }
 
   // Cerrar venta (solo si todo pagado)
@@ -229,5 +244,76 @@ export class VentasService {
 
     item.pagado = true;
     return this.itemCobroRepository.save(item);
+  }
+
+  // Aplicar regalo de promoción
+  async aplicarRegaloPromocion(ventaId: number, opcionSeleccionada: string) {
+    const venta = await this.ventasRepository.findOne({
+      where: { id: ventaId },
+      relations: ['itemsCobro'],
+    });
+    if (!venta) throw new NotFoundException('Venta no encontrada');
+    if (venta.estado !== 'ABIERTA') throw new BadRequestException('La venta no está abierta');
+
+    // Verificar si ya se aplicó promoción
+    const itemPromocion = venta.itemsCobro.find(item => item.tipo === 'PROMOCION');
+    if (itemPromocion) throw new BadRequestException('Ya se aplicó una promoción a esta venta');
+
+    const regalo = await this.promocionesService.aplicarRegaloPromocion(ventaId, opcionSeleccionada);
+
+    if (regalo.tipo === 'DESCUENTO_TIEMPO') {
+      // Extender hora_fin +1 hora (tiempo adicional gratis)
+      if (venta.hora_fin) {
+        venta.hora_fin = new Date(venta.hora_fin.getTime() + 60 * 60 * 1000); // +1 hora
+      }
+      return this.ventasRepository.save(venta);
+    } else {
+      // Buscar item existente no pagado del mismo producto
+      const itemExistente = venta.itemsCobro.find(item => 
+        item.tipo === 'PRODUCTO' && 
+        item.descripcion === regalo.descripcion && 
+        !item.pagado
+      );
+      if (itemExistente) {
+        // Hacer gratis el item existente
+        itemExistente.monto = 0;
+        itemExistente.pagado = true; // Gratis
+        await this.itemCobroRepository.save(itemExistente);
+        
+        // Actualizar el detalle correspondiente para que subtotal sea 0
+        const detalle = await this.detalleVentaRepository.findOne({
+          where: { venta: { id: ventaId }, nombre_producto: regalo.descripcion }
+        });
+        if (detalle) {
+          detalle.subtotal = 0;
+          await this.detalleVentaRepository.save(detalle);
+        }
+        
+        // Recalcular total_productos
+        const totalProductosActual = await this.detalleVentaRepository
+          .createQueryBuilder('detalle')
+          .select('SUM(detalle.subtotal)', 'sum')
+          .where('detalle.venta_id = :ventaId', { ventaId })
+          .getRawOne();
+        venta.total_productos = Number(totalProductosActual.sum) || 0;
+        venta.total_venta = Number((Number(venta.total_productos || 0) + Number(venta.total_recurso || 0)).toFixed(2));
+        return this.ventasRepository.save(venta);
+      } else {
+        // Crear item nuevo gratis si no hay existente
+        const itemGratis = this.itemCobroRepository.create({
+          venta_id: ventaId,
+          tipo: 'PROMOCION',
+          descripcion: regalo.descripcion,
+          cantidad: regalo.cantidad,
+          monto: regalo.monto,
+          pagado: true, // Gratis, ya pagado
+        });
+        await this.itemCobroRepository.save(itemGratis);
+        return this.ventasRepository.findOne({
+          where: { id: ventaId },
+          relations: ['recurso', 'usuario', 'detalles', 'itemsCobro'],
+        });
+      }
+    }
   }
 }
