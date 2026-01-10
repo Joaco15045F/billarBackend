@@ -24,7 +24,7 @@ export class VentasController {
     return this.ventasService.cerrarVenta(Number(id));
   }
 
-  @Post('calcular/:id')
+  @Post(':id/calcular')
   calcular(@Param('id') id: number) {
     return this.ventasService.calcularTiempo(Number(id));
   }
@@ -65,7 +65,7 @@ export class VentasController {
   }
 
   @Post(':id/aplicar-regalo')
-  aplicarRegalo(@Param('id') ventaId: number, @Body() body: { opcion: string }) {
-    return this.ventasService.aplicarRegaloPromocion(Number(ventaId), body.opcion);
+  aplicarRegalo(@Param('id') ventaId: number, @Body() body: { opcionSeleccionada: string }) {
+    return this.ventasService.aplicarRegaloPromocion(Number(ventaId), body.opcionSeleccionada);
   }
 }

@@ -110,7 +110,7 @@ export class VentasService {
   async calcularTiempo(id: number) {
     const venta = await this.ventasRepository.findOne({
       where: { id },
-      relations: ['recurso', 'itemsCobro'],
+      relations: ['recurso', 'detalles', 'itemsCobro'],
     });
 
     if (!venta) {
@@ -123,7 +123,8 @@ export class VentasService {
 
     const horaFin = new Date();
 
-    const diffMs = horaFin.getTime() - new Date(venta.hora_inicio).getTime();
+    // Simulación: Agregar 2 horas extra para probar promociones (quitar en producción)
+    const diffMs = (horaFin.getTime() - new Date(venta.hora_inicio).getTime()) + (2 * 60 * 60 * 1000);
     const duracionHoras = Number((diffMs / (1000 * 60 * 60)).toFixed(2));
 
     const totalRecurso = Number(
@@ -131,7 +132,9 @@ export class VentasService {
     );
 
     // Verificar si ya existe un ítem de recurso
-    const itemRecursoExistente = venta.itemsCobro.find(item => item.tipo === 'RECURSO');
+    const itemRecursoExistente = await this.itemCobroRepository.findOne({
+      where: { venta_id: id, tipo: 'RECURSO' },
+    });
     if (!itemRecursoExistente) {
       // Crear ItemCobro para el recurso
       const itemRecurso = this.itemCobroRepository.create({
@@ -148,8 +151,11 @@ export class VentasService {
 
     // Verificar promociones de tiempo
     const promocion = await this.promocionesService.verificarPromocionTiempo(duracionHoras);
+    const itemPromocion = await this.itemCobroRepository.findOne({
+      where: { venta_id: id, tipo: 'PROMOCION' },
+    });
     let regaloDisponible = null;
-    if (promocion) {
+    if (!itemPromocion && promocion) {
       regaloDisponible = promocion.beneficio.opciones; // Array de opciones
     }
 
@@ -171,7 +177,6 @@ export class VentasService {
   async cerrarVenta(id: number) {
     const venta = await this.ventasRepository.findOne({
       where: { id },
-      relations: ['itemsCobro'],
     });
 
     if (!venta) {
@@ -183,7 +188,9 @@ export class VentasService {
     }
 
     // Verificar que TODOS los items estén pagados
-    const itemsPendientes = venta.itemsCobro.filter(item => !item.pagado);
+    const itemsPendientes = await this.itemCobroRepository.find({
+      where: { venta_id: id, pagado: false },
+    });
     if (itemsPendientes.length > 0) {
       throw new BadRequestException(
         'No se puede cerrar la venta: hay consumos pendientes de pago'
@@ -250,13 +257,14 @@ export class VentasService {
   async aplicarRegaloPromocion(ventaId: number, opcionSeleccionada: string) {
     const venta = await this.ventasRepository.findOne({
       where: { id: ventaId },
-      relations: ['itemsCobro'],
     });
     if (!venta) throw new NotFoundException('Venta no encontrada');
     if (venta.estado !== 'ABIERTA') throw new BadRequestException('La venta no está abierta');
 
     // Verificar si ya se aplicó promoción
-    const itemPromocion = venta.itemsCobro.find(item => item.tipo === 'PROMOCION');
+    const itemPromocion = await this.itemCobroRepository.findOne({
+      where: { venta_id: ventaId, tipo: 'PROMOCION' },
+    });
     if (itemPromocion) throw new BadRequestException('Ya se aplicó una promoción a esta venta');
 
     const regalo = await this.promocionesService.aplicarRegaloPromocion(ventaId, opcionSeleccionada);
@@ -268,27 +276,36 @@ export class VentasService {
       }
       return this.ventasRepository.save(venta);
     } else {
-      // Buscar item existente no pagado del mismo producto
-      const itemExistente = venta.itemsCobro.find(item => 
-        item.tipo === 'PRODUCTO' && 
-        item.descripcion === regalo.descripcion && 
-        !item.pagado
-      );
-      if (itemExistente) {
-        // Hacer gratis el item existente
-        itemExistente.monto = 0;
-        itemExistente.pagado = true; // Gratis
+      // Buscar ítem PRODUCTO existente no pagado del mismo producto
+      const itemExistente = await this.itemCobroRepository.findOne({
+        where: {
+          venta_id: ventaId,
+          tipo: 'PRODUCTO',
+          descripcion: regalo.descripcion,
+          pagado: false,
+        },
+      });
+
+      if (itemExistente && itemExistente.cantidad && itemExistente.cantidad > 0) {
+        // Modificar ítem existente: reducir cantidad en 1 y ajustar monto
+        const precioUnitario = Number(itemExistente.monto) / itemExistente.cantidad;
+        itemExistente.cantidad -= 1;
+        itemExistente.monto = Number((itemExistente.cantidad * precioUnitario).toFixed(2));
+        if (itemExistente.cantidad === 0) {
+          itemExistente.pagado = true; // Si no queda nada, marcar pagado
+        }
         await this.itemCobroRepository.save(itemExistente);
-        
-        // Actualizar el detalle correspondiente para que subtotal sea 0
+
+        // Actualizar el detalle correspondiente
         const detalle = await this.detalleVentaRepository.findOne({
           where: { venta: { id: ventaId }, nombre_producto: regalo.descripcion }
         });
         if (detalle) {
-          detalle.subtotal = 0;
+          detalle.cantidad -= 1;
+          detalle.subtotal = Number((detalle.cantidad * detalle.precio_unitario).toFixed(2));
           await this.detalleVentaRepository.save(detalle);
         }
-        
+
         // Recalcular total_productos
         const totalProductosActual = await this.detalleVentaRepository
           .createQueryBuilder('detalle')
@@ -297,16 +314,28 @@ export class VentasService {
           .getRawOne();
         venta.total_productos = Number(totalProductosActual.sum) || 0;
         venta.total_venta = Number((Number(venta.total_productos || 0) + Number(venta.total_recurso || 0)).toFixed(2));
+
+        // Crear ítem PROMOCION para marcar que se aplicó
+        const itemPromocion = this.itemCobroRepository.create({
+          venta_id: ventaId,
+          tipo: 'PROMOCION',
+          descripcion: regalo.descripcion,
+          cantidad: 1,
+          monto: 0,
+          pagado: true,
+        });
+        await this.itemCobroRepository.save(itemPromocion);
+
         return this.ventasRepository.save(venta);
       } else {
-        // Crear item nuevo gratis si no hay existente
+        // Crear ítem nuevo gratis si no hay existente o cantidad=0
         const itemGratis = this.itemCobroRepository.create({
           venta_id: ventaId,
           tipo: 'PROMOCION',
           descripcion: regalo.descripcion,
-          cantidad: regalo.cantidad,
-          monto: regalo.monto,
-          pagado: true, // Gratis, ya pagado
+          cantidad: 1,
+          monto: 0,
+          pagado: true,
         });
         await this.itemCobroRepository.save(itemGratis);
         return this.ventasRepository.findOne({

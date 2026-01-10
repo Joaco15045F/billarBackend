@@ -37,28 +37,28 @@ export class PromocionesService {
   }
 
   async aplicarRegaloPromocion(ventaId: number, opcionSeleccionada: string): Promise<any> {
-    // Lógica para aplicar el regalo basado en la opción
-    // Esto se integrará con ventas.service
-    const productoMap = {
-      'cerveza': 'Cerveza en Lata',
-      'coca': 'Coca Machucada',
-      'soda': 'Soda 2 Litros',
-    };
+    // Buscar la promoción activa de tiempo
+    const promociones = await this.obtenerPromocionesActivas();
+    const promocion = promociones.find(p =>
+      p.tipo === TipoPromocion.TIEMPO_CON_REGALO &&
+      p.beneficio.opciones.includes(opcionSeleccionada)
+    );
+    if (!promocion) throw new NotFoundException('Opción de regalo inválida');
 
     if (opcionSeleccionada === 'hora_gratis') {
       // Extender tiempo +1 hora gratis
       return { tipo: 'DESCUENTO_TIEMPO', descripcion: '1 hora gratis adicional', monto: 0 };
-    } else if (productoMap[opcionSeleccionada]) {
-      const producto = await this.productoRepository.findOne({ where: { nombre: productoMap[opcionSeleccionada] } });
+    } else {
+      // Buscar el producto por nombre
+      const producto = await this.productoRepository.findOne({ where: { nombre: opcionSeleccionada } });
       if (!producto) throw new NotFoundException('Producto no encontrado');
       return {
         tipo: 'PRODUCTO',
-        descripcion: productoMap[opcionSeleccionada],
+        descripcion: opcionSeleccionada,
         cantidad: 1,
         monto: 0, // Gratis
         producto_id: producto.id
       };
     }
-    throw new NotFoundException('Opción de regalo inválida');
   }
 }
